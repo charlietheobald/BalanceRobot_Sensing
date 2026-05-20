@@ -1,3 +1,6 @@
+// NOTE: ADC DISABLED!
+// Motors under manual control
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
@@ -144,8 +147,8 @@ void loop()
 
     //Set target motor speed proportional to tilt angle
     //Note: this is for demonstrating accelerometer and motors - it won't work as a balance controller
-    step1.setTargetSpeedRad(10);
-    step2.setTargetSpeedRad(-10);
+    step1.setTargetSpeedRad(tiltx*kx);
+    step2.setTargetSpeedRad(-tiltx*kx);
   }
   
   //Print updates every PRINT_INTERVAL ms
