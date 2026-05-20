@@ -147,8 +147,8 @@ void loop()
 
     //Set target motor speed proportional to tilt angle
     //Note: this is for demonstrating accelerometer and motors - it won't work as a balance controller
-    step1.setTargetSpeedRad(10);
-    step2.setTargetSpeedRad(-10);
+    step1.setTargetSpeedRad(2);
+    step2.setTargetSpeedRad(-2);
   }
   
   //Print updates every PRINT_INTERVAL ms
