@@ -133,7 +133,18 @@ void loop()
   static unsigned long printTimer = 0;  //time of the next print
   static unsigned long loopTimer = 0;   //time of the next control update
   static float tiltx = 0.0;             //current tilt angle
+  bool objectdetected = false;
+  int speed = 2;
   
+  distance = calculateDistance();
+
+  if(distance < 10){
+    objectdetected = true;
+  }
+  else{
+    objectdetected = false;
+  }
+
   //Run the control loop every LOOP_INTERVAL ms
   if (millis() > loopTimer) {
     loopTimer += LOOP_INTERVAL;
@@ -147,8 +158,15 @@ void loop()
 
     //Set target motor speed proportional to tilt angle
     //Note: this is for demonstrating accelerometer and motors - it won't work as a balance controller
-    step1.setTargetSpeedRad(2);
-    step2.setTargetSpeedRad(-2);
+    step1.setTargetSpeedRad(speed);
+    step2.setTargetSpeedRad(-speed);
+
+    if(objectdetected == true){
+      speed = 0;
+    }
+    else{
+      speed = 2;
+    }
   }
   
   //Print updates every PRINT_INTERVAL ms
