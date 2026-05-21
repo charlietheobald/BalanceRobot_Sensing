@@ -134,9 +134,8 @@ void loop()
   static unsigned long loopTimer = 0;   //time of the next control update
   static float tiltx = 0.0;             //current tilt angle
   bool objectdetected = false;
-  int speed;
-  int speedL;
-  int speedR;
+  int speed = 1;
+  int speedL = speed; int speedR = speed;
   
   distance = calculateDistance();
   Serial.println(distance); Serial.print(' ');
@@ -145,12 +144,11 @@ void loop()
 
   if(distance < 10){
     objectdetected = true;
-    speedL = 0; speedR = speed;
+    speedL = speed; speedR = -speed;
 
   }
   else{
     objectdetected = false;
-    speed = 1;
     speedL = speed; speedR = speed;
   }
 
