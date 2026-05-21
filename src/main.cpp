@@ -134,15 +134,24 @@ void loop()
   static unsigned long loopTimer = 0;   //time of the next control update
   static float tiltx = 0.0;             //current tilt angle
   bool objectdetected = false;
-  int speed = 2;
+  int speed;
+  int speedL;
+  int speedR;
   
   distance = calculateDistance();
+  Serial.println(distance); Serial.print(' ');
+  Serial.println(objectdetected); Serial.print(' ');
+  Serial.println(speed);
 
   if(distance < 10){
     objectdetected = true;
+    speedL = 0; speedR = speed;
+
   }
   else{
     objectdetected = false;
+    speed = 1;
+    speedL = speed; speedR = speed;
   }
 
   //Run the control loop every LOOP_INTERVAL ms
@@ -158,15 +167,9 @@ void loop()
 
     //Set target motor speed proportional to tilt angle
     //Note: this is for demonstrating accelerometer and motors - it won't work as a balance controller
-    step1.setTargetSpeedRad(speed);
-    step2.setTargetSpeedRad(-speed);
+    step1.setTargetSpeedRad(speedR);
+    step2.setTargetSpeedRad(-speedL);
 
-    if(objectdetected == true){
-      speed = 0;
-    }
-    else{
-      speed = 2;
-    }
   }
   
   //Print updates every PRINT_INTERVAL ms
@@ -176,7 +179,7 @@ void loop()
     
     // Read the current distance synchronously right before printing
     distance = calculateDistance();
-
+    /*
     Serial.print(tiltx*1000);
     Serial.print(' ');
     Serial.print(step1.getSpeedRad());
@@ -185,6 +188,7 @@ void loop()
     Serial.print(' ');
     Serial.print(distance);
     Serial.println();
+    */
   }
 }
 
