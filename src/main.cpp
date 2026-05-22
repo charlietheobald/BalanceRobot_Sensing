@@ -7,6 +7,7 @@
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <step.h>
+#include <Servo.h>
 
 int calculateDistance();
 
@@ -19,6 +20,8 @@ const int STEPPER_EN_PIN    = 15;
 
 const int ULTRA_TRIG = 2;
 const int ULTRA_ECHO = 4;
+
+const int SERVO = 33;
 
 
 //ADC pins
@@ -39,6 +42,8 @@ const float VREF = 4.096;
 
 long duration;
 float distance;
+
+Servo myServo;
 
 
 //Global objects
@@ -85,6 +90,7 @@ void setup()
 {
   Serial.begin(115200);
   pinMode(TOGGLE_PIN,OUTPUT);
+  myServo.attach(SERVO);
 
   // Try to initialize Accelerometer/Gyroscope
   if (!mpu.begin()) {
@@ -136,11 +142,35 @@ void loop()
   bool objectdetected = false;
   int speed = 1;
   int speedL = speed; int speedR = speed;
+
+  for(int i=15;i<=105; i++){  
+    myServo.write(i);
+    delay(30);
+    //distance = calculateDistance();// Calls a function for calculating the distance measured by the Ultrasonic sensor for each degree
+    Serial.print(i); // Sends the current degree into the Serial Port
+    Serial.print(","); // Sends addition character right next to the previous value needed later in the Processing IDE for indexing
+    //Serial.print(distance); // Sends the distance value into the Serial Port
+    //Serial.print(".");
+  }
+
+  for(int i=105;i>15; i--){  
+    myServo.write(i);
+    delay(30);
+    //distance = calculateDistance();// Calls a function for calculating the distance measured by the Ultrasonic sensor for each degree
+    Serial.print(i); // Sends the current degree into the Serial Port
+    Serial.print(","); // Sends addition character right next to the previous value needed later in the Processing IDE for indexing
+    //Serial.print(distance); // Sends the distance value into the Serial Port
+    //Serial.print(".");
+  }
+
+
+
+
   
   distance = calculateDistance();
-  Serial.println(distance); Serial.print(' ');
-  Serial.println(objectdetected); Serial.print(' ');
-  Serial.println(speed);
+  //Serial.println(distance); Serial.print(' ');
+  //Serial.println(objectdetected); Serial.print(' ');
+  //Serial.println(speed);
 
   if(distance < 10){
     objectdetected = true;
