@@ -1,6 +1,5 @@
 // NOTE: ADC DISABLED!
 // Motors under manual control
-
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
@@ -41,7 +40,7 @@ const float kx = 20.0;
 const float VREF = 4.096;
 
 long duration;
-float distance;
+int distance;
 
 Servo myServo;
 
@@ -143,34 +142,28 @@ void loop()
   int speed = 1;
   int speedL = speed; int speedR = speed;
 
-  for(int i=15;i<=105; i++){  
-    myServo.write(i);
-    delay(30);
-    //distance = calculateDistance();// Calls a function for calculating the distance measured by the Ultrasonic sensor for each degree
-    Serial.print(i); // Sends the current degree into the Serial Port
+  for(int angle = 30; angle<=150; angle++){  
+    myServo.write(angle);
+    delay(5);
+    
+    distance = calculateDistance();// Calls a function for calculating the distance measured by the Ultrasonic sensor for each degree
+    Serial.print(angle); // Sends the current degree into the Serial Port
     Serial.print(","); // Sends addition character right next to the previous value needed later in the Processing IDE for indexing
-    //Serial.print(distance); // Sends the distance value into the Serial Port
-    //Serial.print(".");
+    Serial.print(distance); // Sends the distance value into the Serial Port
+    Serial.print(".");
   }
 
-  for(int i=105;i>15; i--){  
-    myServo.write(i);
-    delay(30);
-    //distance = calculateDistance();// Calls a function for calculating the distance measured by the Ultrasonic sensor for each degree
-    Serial.print(i); // Sends the current degree into the Serial Port
+  for(int angle =150; angle >30; angle --){  
+    myServo.write(angle);
+    delay(5);
+
+    distance = calculateDistance();// Calls a function for calculating the distance measured by the Ultrasonic sensor for each degree
+    Serial.print(angle); // Sends the current degree into the Serial Port
     Serial.print(","); // Sends addition character right next to the previous value needed later in the Processing IDE for indexing
-    //Serial.print(distance); // Sends the distance value into the Serial Port
-    //Serial.print(".");
+    Serial.print(distance); // Sends the distance value into the Serial Port
+    Serial.print(".");
   }
 
-
-
-
-  
-  distance = calculateDistance();
-  //Serial.println(distance); Serial.print(' ');
-  //Serial.println(objectdetected); Serial.print(' ');
-  //Serial.println(speed);
 
   if(distance < 10){
     objectdetected = true;
