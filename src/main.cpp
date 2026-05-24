@@ -1,5 +1,9 @@
 // NOTE: ADC DISABLED!
 // Motors under manual control
+
+// Increase number of measurements
+// Calculate an average
+// Exclude any ridiculous
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
@@ -7,8 +11,8 @@
 #include <Adafruit_Sensor.h>
 #include <step.h>
 #include <Servo.h>
+#include <ultrasound.h>
 
-int calculateDistance();
 
 // The Stepper pins
 const int STEPPER1_DIR_PIN  = 16; // changeme
@@ -20,7 +24,7 @@ const int STEPPER_EN_PIN    = 15;
 const int ULTRA_TRIG = 2;
 const int ULTRA_ECHO = 4;
 
-const int SERVO = 33;
+const int SERVO_PIN = 33;
 
 
 //ADC pins
@@ -42,7 +46,6 @@ const float VREF = 4.096;
 long duration;
 int distance;
 
-Servo myServo;
 
 
 //Global objects
@@ -51,6 +54,8 @@ Adafruit_MPU6050 mpu;         //Default pins for I2C are SCL: IO22, SDA: IO21
 
 step step1(STEPPER_INTERVAL_US,STEPPER1_STEP_PIN,STEPPER1_DIR_PIN );
 step step2(STEPPER_INTERVAL_US,STEPPER2_STEP_PIN,STEPPER2_DIR_PIN );
+
+ultrasound US (ULTRA_TRIG, ULTRA_ECHO, SERVO_PIN);
 
 
 //Interrupt Service Routine for motor update
@@ -89,7 +94,7 @@ void setup()
 {
   Serial.begin(115200);
   pinMode(TOGGLE_PIN,OUTPUT);
-  myServo.attach(SERVO);
+  US.attachServo();
 
   // Try to initialize Accelerometer/Gyroscope
   if (!mpu.begin()) {
@@ -124,12 +129,6 @@ void setup()
   digitalWrite(ADC_CS_PIN, HIGH);
   SPI.begin(ADC_SCK_PIN, ADC_MISO_PIN, ADC_MOSI_PIN, ADC_CS_PIN);
 
-
-  // The ultrasound sensing logic. Move elsewhere
-
-  pinMode(ULTRA_TRIG, OUTPUT); // Sets the trigPin as an Output
-  pinMode(ULTRA_ECHO, INPUT); // Sets the echoPin as an Input
-
 }
 
 void loop()
@@ -142,36 +141,11 @@ void loop()
   int speed = 1;
   int speedL = speed; int speedR = speed;
 
-  for(int angle = 30; angle<=150; angle++){  
-    myServo.write(angle);
-    delay(5);
-    
-    distance = calculateDistance();// Calls a function for calculating the distance measured by the Ultrasonic sensor for each degree
-    Serial.print(angle); // Sends the current degree into the Serial Port
-    Serial.print(","); // Sends addition character right next to the previous value needed later in the Processing IDE for indexing
-    Serial.print(distance); // Sends the distance value into the Serial Port
-    Serial.print(".");
-  }
 
-  for(int angle =150; angle >30; angle --){  
-    myServo.write(angle);
-    delay(5);
-
-    distance = calculateDistance();// Calls a function for calculating the distance measured by the Ultrasonic sensor for each degree
-    Serial.print(angle); // Sends the current degree into the Serial Port
-    Serial.print(","); // Sends addition character right next to the previous value needed later in the Processing IDE for indexing
-    Serial.print(distance); // Sends the distance value into the Serial Port
-    Serial.print(".");
-  }
-
-
-  if(distance < 10){
-    objectdetected = true;
+  if(US.objectDetected(distance)){
     speedL = speed; speedR = -speed;
-
   }
   else{
-    objectdetected = false;
     speedL = speed; speedR = speed;
   }
 
@@ -199,7 +173,7 @@ void loop()
     printTimer += PRINT_INTERVAL;
     
     // Read the current distance synchronously right before printing
-    distance = calculateDistance();
+    distance = US.calculateDistance();
     /*
     Serial.print(tiltx*1000);
     Serial.print(' ');
@@ -211,19 +185,4 @@ void loop()
     Serial.println();
     */
   }
-}
-
-int calculateDistance(){ 
-  
-  digitalWrite(ULTRA_TRIG, LOW); 
-  delayMicroseconds(2);
-  // Sets the trigPin on HIGH state for 10 micro seconds
-  digitalWrite(ULTRA_TRIG, HIGH); 
-  delayMicroseconds(10);
-  digitalWrite(ULTRA_TRIG, LOW);
-  duration = pulseIn(ULTRA_ECHO, HIGH); // Reads the echoPin, returns the sound wave travel time in microseconds
-
-// Moving average 
-  distance = duration*0.034/2.00;
-  return distance;
 }
