@@ -75,18 +75,18 @@ bool TimerHandler(void * timerNo)
 }
 
 uint16_t readADC(uint8_t channel) {
-  uint8_t TX0 = 0x06 | (channel >> 2);  // Command Byte 0 = Start bit + single-ended mode + MSB of channel
-  //uint8_t TX1 = (channel & 0x03) << 6;  // Command Byte 1 = Remaining 2 bits of channel
+  uint8_t tx0 = 0x06 | (channel >> 2);  // Command Byte 0 = Start bit + single-ended mode + MSB of channel
+  uint8_t tx1 = (channel & 0x03) << 6;  // Command Byte 1 = Remaining 2 bits of channel
 
   digitalWrite(ADC_CS_PIN, LOW); 
 
-  SPI.transfer(TX0);                    // Send Command Byte 0
-  uint8_t RX0 = SPI.transfer(TX1);      // Send Command Byte 1 and receive high byte of result
-  //uint8_t RX1 = SPI.transfer(0x00);     // Send dummy byte and receive low byte of result
+  SPI.transfer(tx0);                    // Send Command Byte 0
+  uint8_t rx0 = SPI.transfer(tx1);      // Send Command Byte 1 and receive high byte of result
+  uint8_t rx1 = SPI.transfer(0x00);     // Send dummy byte and receive low byte of result
 
   digitalWrite(ADC_CS_PIN, HIGH); 
 
-  uint16_t result = ((RX0 & 0x0F) << 8) | RX1; // Combine high and low byte into 12-bit result
+  uint16_t result = ((rx0 & 0x0F) << 8) | rx1; // Combine high and low byte into 12-bit result
   return result;
 }
 
