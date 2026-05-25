@@ -183,8 +183,8 @@ void setup()
   digitalWrite(ADC_CS_PIN, HIGH);
   SPI.begin(ADC_SCK_PIN, ADC_MISO_PIN, ADC_MOSI_PIN, ADC_CS_PIN);
 
-  Serial.println("Ready. Balancing starting now.");
-  Serial.println("angle(deg) error(deg) motor(rad/s)");
+  //Serial.println("Ready. Balancing starting now.");
+  //Serial.println("angle(deg) error(deg) motor(rad/s)");
 
 }
 
@@ -208,7 +208,9 @@ void loop()
   static bool objectdetected = false;
   static int speed = 1;
   static int speedL = speed; static int speedR = speed;
+  static int measPerAngle = 3;
 
+  US.servoSweep(30, 150, 3, measPerAngle);
 
   // SPEED CONTROLLED BY ULTRASOUND SENSOR
   if(US.objectDetected(distance)){
