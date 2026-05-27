@@ -1,111 +1,114 @@
+#ifndef ULTRASOUND_H
+#define ULTRASOUND_H
+
 #include <Arduino.h>
-#include <Servo.h>
+#include <ESP32Servo.h>
+
+extern int radarMap[181];
+extern int currentRadarAngle;
 
 class ultrasound {
 
 public:
-ultrasound(int trig, int echo, int servo) : trigPin(trig), echoPin(echo), servoPin(servo){
-    pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
-    pinMode(echoPin, INPUT); // Sets the echoPin as an Input
-}
-
-int distance;
-int angle;
-
-void attachServo(){
-    ultraServo.attach(servoPin);
-}
-
-int calculateDistance(){ 
-  
-  digitalWrite(trigPin, LOW); 
-  delayMicroseconds(2);
-  // Sets the trigPin on HIGH state for 10 micro seconds
-  digitalWrite(trigPin, HIGH); 
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH, 7300); // Reads the echoPin, returns the sound wave travel time in microseconds. Currently set to around 125cm
-  if(duration == 0){return 150;} // Improves timing by removing any measurements that don't receive a reflection in time
-  distance = duration*0.034/2.00;
-  return distance;
-}
-
-bool objectDetected(int distance){
-    bool found;
-
-    if(distance < 10){
-        found = true;
+    ultrasound(int trig, int echo, int servo) : trigPin(trig), echoPin(echo), servoPin(servo){
+        pinMode(trigPin, OUTPUT); 
+        pinMode(echoPin, INPUT); 
     }
-    else{
-        found = false;
+
+    int distance;
+    int angle;
+
+    void attachServo(){
+        ultraServo.setPeriodHertz(50);
+        ultraServo.attach(servoPin, 500, 2400);
     }
-    return found;
-}
 
-void servoSweep(int startAngle, int endAngle, int dly, int measPerAngle) {
-    // 1. Declare historical variables HERE so both forward and backward 
-    // loops share the continuous memory as the sensor moves back and forth.
-    static float r1 = 150.0f;
-    static float r2 = 150.0f;
-    static float r3 = 150.0f;
+    int calculateDistance(){  
+        digitalWrite(trigPin, LOW); 
+        delayMicroseconds(2);
+        digitalWrite(trigPin, HIGH); 
+        delayMicroseconds(10);
+        digitalWrite(trigPin, LOW);
+        duration = pulseIn(echoPin, HIGH, 7300); 
+        if(duration == 0){return 150;} 
+        distance = duration*0.034/2.00;
+        return distance;
+    }
 
-    // --- FORWARD SWEEP ---
-    for (int angle = startAngle * measPerAngle; angle <= endAngle * measPerAngle; angle++) {
-        ultraServo.write(angle / measPerAngle);
-        delay(dly / measPerAngle);
+    bool objectDetected(int distance){
+        bool found;
+        if(distance < 10){
+            found = true;
+        }
+        else{
+            found = false;
+        }
+        return found;
+    }
 
-        // Capture raw data
-        float calcDistance = calculateDistance();  
+    void servoSweep(int startAngle, int endAngle, int dly, int measPerAngle) {
+        static float r1 = 150.0f;
+        static float r2 = 150.0f;
+        static float r3 = 150.0f;
+
+        for (int angle = startAngle * measPerAngle; angle <= endAngle * measPerAngle; angle++) {
+            int calcAngle = angle / measPerAngle;
+            currentRadarAngle = calcAngle;
+            
+            ultraServo.write(calcAngle);
+            delay(dly / measPerAngle);
+
+            float calcDistance = calculateDistance();  
+            
+            r3 = r2;
+            r2 = r1;
+            r1 = calcDistance;
         
-        // Push into shared history pipeline
-        r3 = r2;
-        r2 = r1;
-        r1 = calcDistance;
-    
-        // Calculate the true float average
-        int distanceAvg = (r1 + r2 + r3) / measPerAngle; 
+            int distanceAvg = (r1 + r2 + r3) / measPerAngle; 
 
-        // Send to Processing
-        Serial.print(angle / measPerAngle); 
-        Serial.print(","); 
-        Serial.print(distanceAvg); 
-        Serial.print("."); 
-    }
+            if(calcAngle >= 0 && calcAngle <= 180) {
+                radarMap[calcAngle] = distanceAvg;
+            }
 
-    // --- BACKWARD SWEEP ---
-    for (int angle = endAngle * measPerAngle; angle >= startAngle * measPerAngle; angle--) {
-        ultraServo.write(angle / measPerAngle);
-        delay(dly / measPerAngle);
+            Serial.print(calcAngle); 
+            Serial.print(","); 
+            Serial.print(distanceAvg); 
+            Serial.print("."); 
+        }
 
-        // Capture raw data
-        float calcDistance = calculateDistance();  
+        for (int angle = endAngle * measPerAngle; angle >= startAngle * measPerAngle; angle--) {
+            int calcAngle = angle / measPerAngle;
+            currentRadarAngle = calcAngle;
+
+            ultraServo.write(calcAngle);
+            delay(dly / measPerAngle);
+
+            float calcDistance = calculateDistance();  
+            
+            r3 = r2;
+            r2 = r1;
+            r1 = calcDistance;
         
-        // Push into the EXACT SAME history pipeline
-        r3 = r2;
-        r2 = r1;
-        r1 = calcDistance;
-    
-        // Corrected math block (Fixed the circular definition & layout typo)
-        int distanceAvg = (r1 + r2 + r3) / 3.0f; 
+            int distanceAvg = (r1 + r2 + r3) / 3.0f; 
 
-        // Send to Processing
-        Serial.print(angle / measPerAngle); 
-        Serial.print(","); 
-        Serial.print(distanceAvg);
-        Serial.print("."); 
+            if(calcAngle >= 0 && calcAngle <= 180) {
+                radarMap[calcAngle] = distanceAvg;
+            }
+
+            Serial.print(calcAngle); 
+            Serial.print(","); 
+            Serial.print(distanceAvg);
+            Serial.print("."); 
+        }
     }
-}
-
-
-
-
 
 private:
-int trigPin;
-int echoPin;
-int servoPin;
-Servo ultraServo;
-long duration;
-int reflectionTimeout;
+    int trigPin;
+    int echoPin;
+    int servoPin;
+    Servo ultraServo;
+    long duration;
+    int reflectionTimeout;
 };
 
+#endif
