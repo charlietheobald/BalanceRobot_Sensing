@@ -8,6 +8,9 @@
 #include <step.h>
 #include <ultrasound.h>
 
+#include <WiFi.h>
+#include <WebServer.h>
+
 
 // PIN DEFINITIONS
 
@@ -29,9 +32,75 @@ const int ADC_SCK_PIN       = 18;
 const int ADC_MISO_PIN      = 19;
 const int ADC_MOSI_PIN      = 23;
 
+
 // Diagnostic pin for oscilloscope
 const int TOGGLE_PIN        = 32;
 
+const char* ssid     = "robet";
+const char* password = "1234567890";
+
+WebServer server(80);
+
+ultrasound US (ULTRA_TRIG, ULTRA_ECHO, SERVO_PIN);
+
+// --- WEB SERVER HANDLERS ---
+
+// 1. Root Handler: Serves the beautiful dashboard page framework to your laptop
+void handleRoot() {
+  String html = R"rawhtml(
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Robot Telemetry</title>
+    <style>
+      body { font-family: 'Segoe UI', Arial, sans-serif; background: #121212; color: #e0e0e0; text-align: center; margin:0; padding:20px; }
+      h1 { color: #00e676; margin-bottom: 30px; }
+      .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 900px; margin: 0 auto; }
+      .card { background: #1e1e1e; border-radius: 12px; padding: 25px; width: 220px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid #333; }
+      .card h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin: 0 0 15px 0; }
+      .value { font-size: 36px; font-weight: bold; color: #fff; }
+      .unit { font-size: 16px; color: #888; margin-left: 4px; }
+      #card-angle { border-top: 4px solid #2196f3; }
+      #card-distance { border-top: 4px solid #ff9800; }
+      #card-voltage { border-top: 4px solid #00e676; }
+    </style>
+    <script>
+      // Automatically request refreshed JSON payload every 200ms
+      setInterval(function() {
+        fetch('/data')
+          .then(response => response.json())
+          .then(data => {
+            document.getElementById('angle').innerText = data.angle.toFixed(2);
+            document.getElementById('distance').innerText = data.distance;
+            document.getElementById('voltage').innerText = data.voltage.toFixed(2);
+          })
+          .catch(err => console.error(err));
+      }, 200);
+    </script>
+  </head>
+  <body>
+    <h1>ESP32 Robot Dashboard</h1>
+    <div class="container">
+      <div class="card" id="card-angle"><h2>Robot Angle</h2><span class="value" id="angle">0.0</span><span class="unit">&deg;</span></div>
+      <div class="card" id="card-distance"><h2>Object Distance</h2><span class="value" id="distance">0</span><span class="unit">cm</span></div>
+      <div class="card" id="card-voltage"><h2>Battery Voltage</h2><span class="value" id="voltage">0.00</span><span class="unit">V</span></div>
+    </div>
+  </body>
+  </html>
+  )rawhtml";
+  server.send(200, "text/html", html);
+}
+
+// 2. Data Endpoint Handler: Sends lightweight background JSON streams
+void handleData() {
+  String json = "{";
+  json += "\"angle\":" + String(US.angle) + ",";
+  json += "\"distance\":" + String(US.distance) + ",";
+  //json += "\"voltage\":" + String(voltage); // ADD LATER
+  json += "}";
+  server.send(200, "application/json", json);
+}
 
 // PID GAINS
 /*error in degrees -> output in rad/s
@@ -88,8 +157,6 @@ Adafruit_MPU6050 mpu;         //Default pins for I2C are SCL: IO22, SDA: IO21
 
 step step1(STEPPER_INTERVAL_US,STEPPER1_STEP_PIN,STEPPER1_DIR_PIN );
 step step2(STEPPER_INTERVAL_US,STEPPER2_STEP_PIN,STEPPER2_DIR_PIN );
-
-ultrasound US (ULTRA_TRIG, ULTRA_ECHO, SERVO_PIN);
 
 
 //Interrupt Service Routine for motor update
@@ -162,6 +229,24 @@ void setup()
   Serial.printf("Balance setpoint: %.2f deg\n", (float)balanceAngleDeg);
 
 
+  // Connect to Wi-Fi Network
+  Serial.print("Connecting to Wi-Fi: ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWi-Fi Connected!");
+  Serial.print("Local IP Address: http://");
+  Serial.println(WiFi.localIP()); // <-- THIS IS THE URL TO VISIT ON YOUR LAPTOP
+
+  // Set up Web Server Endpoints
+  server.on("/", handleRoot);
+  server.on("/data", handleData);
+  server.begin();
+  Serial.println("HTTP Server started.");
+
 
   //Attach motor update ISR to timer to run every STEPPER_INTERVAL_US μs
   if (!ITimer.attachInterruptInterval(STEPPER_INTERVAL_US, TimerHandler)) {
@@ -209,6 +294,25 @@ void loop()
   static int speed = 1;
   static int speedL = speed; static int speedR = speed;
   static int measPerAngle = 3;
+
+  /*
+  static int batteryVoltageADC = analogRead(BATTERY_VOLTAGE); // this should be an integer between 0 and 4095
+  static float batteryPinVoltage = 3.30f / 4095 * batteryVoltageADC;
+  static float actualVoltageDrop = batteryPinVoltage / 1100;
+  Serial.print(batteryVoltageADC);
+  Serial.print(".");
+  Serial.print(batteryPinVoltage);
+  Serial.print(".");
+  Serial.print(actualVoltageDrop);
+  */
+ 
+  // What else do we want?
+  // Convert the voltage to a current
+  // Instantaneous power = I^2 R
+  // Create a variable to sum the power consumption over multiple cycles to obtain the total power consumed
+
+
+  
 
   US.servoSweep(30, 150, 3, measPerAngle);
 
@@ -283,7 +387,7 @@ void loop()
         smoothed_output = 0.0f;
     }
 
-     step1.setTargetSpeedRad(-smoothed_output);
+    step1.setTargetSpeedRad(-smoothed_output);
     step2.setTargetSpeedRad(smoothed_output);
 
     //step1.setTargetSpeedRad(-output);
@@ -296,22 +400,21 @@ void loop()
   }
 
 
-  //Print updates every PRINT_INTERVAL ms
+  //Print updates every PR  INT_INTERVAL ms
   //Line format: X-axis tilt, Motor speed, A0 Voltage, Ultrasound Distance (cm)
   if(millis() > printTimer){
     printTimer += PRINT_INTERVAL;
     
     // Read the current distance synchronously right before printing
     distance = US.calculateDistance();
-    /*
-    Serial.print(tiltx*1000);
-    Serial.print(' ');
-    Serial.print(step1.getSpeedRad());
-    Serial.print(' ');
-    Serial.print((readADC(0) * VREF)/4095.0);
-    Serial.print(' ');
-    Serial.print(distance);
-    Serial.println();
-    */
+
+    //Serial.print(tiltx*1000);
+    //Serial.print(' ');
+    //Serial.print(step1.getSpeedRad());
+    //Serial.print(' ');
+    //Serial.print((readADC(0) * VREF)/4095.0);
+    //Serial.print(' ');
+    //Serial.print(distance);
+    //Serial.println();
   }
 }

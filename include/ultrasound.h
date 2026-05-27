@@ -9,6 +9,9 @@ ultrasound(int trig, int echo, int servo) : trigPin(trig), echoPin(echo), servoP
     pinMode(echoPin, INPUT); // Sets the echoPin as an Input
 }
 
+int distance;
+int angle;
+
 void attachServo(){
     ultraServo.attach(servoPin);
 }
@@ -60,13 +63,13 @@ void servoSweep(int startAngle, int endAngle, int dly, int measPerAngle) {
         r1 = calcDistance;
     
         // Calculate the true float average
-        int distanceAvg = (r1 + r2 + r3) / 3; 
+        int distanceAvg = (r1 + r2 + r3) / measPerAngle; 
 
         // Send to Processing
         Serial.print(angle / measPerAngle); 
         Serial.print(","); 
         Serial.print(distanceAvg); 
-        Serial.println();
+        Serial.print("."); 
     }
 
     // --- BACKWARD SWEEP ---
@@ -88,10 +91,12 @@ void servoSweep(int startAngle, int endAngle, int dly, int measPerAngle) {
         // Send to Processing
         Serial.print(angle / measPerAngle); 
         Serial.print(","); 
-        Serial.print(distanceAvg); 
-        Serial.println();
+        Serial.print(distanceAvg);
+        Serial.print("."); 
     }
 }
+
+
 
 
 
@@ -101,7 +106,6 @@ int echoPin;
 int servoPin;
 Servo ultraServo;
 long duration;
-int distance;
 int reflectionTimeout;
 };
 
