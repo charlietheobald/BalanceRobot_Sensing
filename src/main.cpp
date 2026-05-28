@@ -163,7 +163,7 @@ void setup()
 
   // INIT MPU6050 GYRO
   if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
+    Serial.println("No connection to MPU6050 chip");
     while (1) {
       delay(10);
     }
@@ -235,9 +235,14 @@ void loop()
   static bool objectdetected = false;
   static int speed = 1;
   static int speedL = speed; static int speedR = speed;
-  static int measPerAngle = 3;
+  static int measPerAngle = 2; // this may need to be changed
 
-  US.servoSweep(30, 150, 1, measPerAngle, [](int angle, int dist){ // This is a callback from ultrasound.h
+
+  // insert PID parameters here
+
+
+  // Send UDP packet with ultrasound data. To be moved to Raspberry Pi in the future
+  US.servoSweep(30, 150, 3, measPerAngle, [](int angle, int dist){ // This is a callback from ultrasound.h
     char buf[32];
     int len = snprintf(buf, sizeof(buf), "%d,%d", angle, dist);
     udp.beginPacket(UDP_DEST, UDP_PORT);
