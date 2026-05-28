@@ -1,8 +1,6 @@
 #include <Arduino.h>
 #include <Servo.h>
 
-#include <WiFi.h>
-#include <WifiUDP.h>
 
 // UDP socket
 
@@ -11,12 +9,12 @@ class ultrasound {
 public:
 
 int distance;
-int angle;
+int angle = 30;
 int distanceAvg;
 
 ultrasound(int trig, int echo, int servo) : trigPin(trig), echoPin(echo), servoPin(servo){
-    pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
-    pinMode(echoPin, INPUT); // Sets the echoPin as an Input
+    pinMode(trigPin, OUTPUT); // trigger is an output
+    pinMode(echoPin, INPUT); // echo is an input
 }
 
 void attachServo(){
@@ -49,7 +47,7 @@ bool objectDetected(int distance){
     return found;
 }
 
-void servoSweep(int startAngle, int endAngle, int dly, int measPerAngle) {
+void servoSweep(int startAngle, int endAngle, int dly, int measPerAngle, void(*onMeasurement)(int,int) = nullptr) {
     // 1. Declare historical variables HERE so both forward and backward 
     // loops share the continuous memory as the sensor moves back and forth.
     static float r1 = 150.0f;
@@ -73,10 +71,11 @@ void servoSweep(int startAngle, int endAngle, int dly, int measPerAngle) {
         distanceAvg = (r1 + r2 + r3) / measPerAngle; 
 
         // Send to Processing
-        Serial.print(angle / measPerAngle); 
-        Serial.print(","); 
-        Serial.print(distanceAvg); 
-        Serial.println();
+        //Serial.print(angle / measPerAngle); 
+        //Serial.print(","); 
+        //Serial.print(distanceAvg); 
+        //Serial.println();
+        if(onMeasurement) onMeasurement(angle / measPerAngle, distanceAvg);
     }
 
     // --- BACKWARD SWEEP ---
@@ -93,13 +92,15 @@ void servoSweep(int startAngle, int endAngle, int dly, int measPerAngle) {
         r1 = calcDistance;
     
         // Corrected math block (Fixed the circular definition & layout typo)
-        int distanceAvg = (r1 + r2 + r3) / 3.0f; 
+        int distanceAvg = (r1 + r2 + r3) / measPerAngle; 
 
         // Send to Processing
-        Serial.print(angle / measPerAngle); 
-        Serial.print(","); 
-        Serial.print(distanceAvg); 
-        Serial.println();
+        //Serial.print(angle / measPerAngle); 
+        //Serial.print(","); 
+        //Serial.print(distanceAvg); 
+        //Serial.println();
+
+        if(onMeasurement) onMeasurement(angle / measPerAngle, distanceAvg);
     }
 }
 

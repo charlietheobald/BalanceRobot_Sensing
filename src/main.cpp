@@ -240,17 +240,13 @@ void loop()
   static int speedL = speed; static int speedR = speed;
   static int measPerAngle = 3;
 
-  US.servoSweep(30, 150, 3, measPerAngle);
-
-  // Send distance (cm) and current servo angle (deg) over UDP after every sweep
-  {
-    int servoAngle = US.angle; // degrees
+  US.servoSweep(30, 150, 1, measPerAngle, [](int angle, int dist){ // This is a callback from ultrasound.h
     char buf[32];
-    int len = snprintf(buf, sizeof(buf), "%d,%d", distance, servoAngle);
+    int len = snprintf(buf, sizeof(buf), "%d,%d", angle, dist);
     udp.beginPacket(UDP_DEST, UDP_PORT);
     udp.write((const uint8_t*)buf, len);
     udp.endPacket();
-  }
+  });
 
   // SPEED CONTROLLED BY ULTRASOUND SENSOR
   if(US.objectDetected(distance)){
