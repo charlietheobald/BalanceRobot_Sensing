@@ -2,6 +2,7 @@
 #include <Servo.h>
 
 #include <WiFi.h>
+#include <WifiUDP.h>
 
 // UDP socket
 

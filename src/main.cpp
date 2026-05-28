@@ -1,5 +1,5 @@
-// Increase number of measurements per ultrasound cycle
-// Calculate an average per integer angle
+// TODO:
+// Move the WiFiUDP stuff into the ultrasound header (or cpp if easier?)
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
