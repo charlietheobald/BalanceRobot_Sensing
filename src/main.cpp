@@ -110,8 +110,8 @@ int currentRadarAngle = 30; // sets initial radar angle to 30 deg
 ESP32Timer ITimer(3);
 Adafruit_MPU6050 mpu;         //Default pins for I2C are SCL: IO22, SDA: IO21
 
-step steP5V(STEPPER_INTERVAL_US,STEPPER1_STEP_PIN,STEPPER1_DIR_PIN );
-step stePMOT(STEPPER_INTERVAL_US,STEPPER2_STEP_PIN,STEPPER2_DIR_PIN );
+step step1(STEPPER_INTERVAL_US,STEPPER1_STEP_PIN,STEPPER1_DIR_PIN );
+step step2(STEPPER_INTERVAL_US,STEPPER2_STEP_PIN,STEPPER2_DIR_PIN );
 
 ultrasound US (ULTRA_TRIG, ULTRA_ECHO, SERVO_PIN);
 
@@ -123,8 +123,8 @@ bool TimerHandler(void * timerNo)
   static bool toggle = false;
 
   //Update the stepper motors
-  steP5V.runStepper();
-  stePMOT.runStepper();
+  step1.runStepper();
+  step2.runStepper();
 
   //Indicate that the ISR is running
   digitalWrite(TOGGLE_PIN,toggle);  
@@ -161,7 +161,6 @@ void setup()
   // INIT SERVO
   US.attachServo();
 
-
   // INIT MPU6050 GYRO
   if (!mpu.begin()) {
     Serial.println("Failed to find MPU6050 chip");
@@ -173,21 +172,6 @@ void setup()
   mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
   mpu.setGyroRange(MPU6050_RANGE_250_DEG);
   mpu.setFilterBandwidth(MPU6050_BAND_44_HZ);
-
-
-  // GYRO BIAS CALIBRATION - 3s ON STARTUP
-  Serial.println("Gyro calibration -- hold still for 3 s...");
-  const int CAL_SAMPLES = 300;
-  float gyroSum = 0.0f;
-  for (int i = 0; i < CAL_SAMPLES; i++) {
-      sensors_event_t a, g, temp;
-      mpu.getEvent(&a, &g, &temp);
-      gyroSum += g.gyro.y;
-      delay(10);
-  }
-  gyroYBias = gyroSum / CAL_SAMPLES;
-  Serial.printf("Gyro bias: %.5f rad/s\n", gyroYBias);
-  Serial.printf("Balance setpoint: %.2f deg\n", (float)balanceAngleDeg);
 
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -211,8 +195,8 @@ void setup()
 
 
   //SET AND UNLOCK MOTORS
-  steP5V.setAccelerationRad(MOTOR_ACCEL_RAD);
-  stePMOT.setAccelerationRad(MOTOR_ACCEL_RAD);
+  step1.setAccelerationRad(MOTOR_ACCEL_RAD);
+  step2.setAccelerationRad(MOTOR_ACCEL_RAD);
   pinMode(STEPPER_EN_PIN,OUTPUT);
   digitalWrite(STEPPER_EN_PIN, false);
 
@@ -269,113 +253,40 @@ void loop()
     speedL = speed; speedR = speed;
   }
 
-  //steP5V.setTargetSpeedRad(speedR);
-  //stePMOT.setTargetSpeedRad(-speedL);
+  //step1.setTargetSpeedRad(speedR);
+  //step2.setTargetSpeedRad(-speedL);
 
-
-  // PID SPEED CONTROL
-
-  //Run the control loop every LOOP_INTERVAL ms
-  if (millis() > loopTimer) {
-    loopTimer += LOOP_INTERVAL;
-
-    const float dt = LOOP_INTERVAL / 1000.0f;
-
-    sensors_event_t a, g, temp;
-    mpu.getEvent(&a, &g, &temp);
-
-    // Angle in degrees via complementary filter
-    // NOTE: Removed the word 'float' so it uses the global ones above
-    accelAngleDeg = atan2(a.acceleration.x, a.acceleration.z) * RAD_TO_DEG;
-    gyroRateDeg   = -(g.gyro.y - gyroYBias)    * RAD_TO_DEG;
-
-    if (firstRun) { angle = accelAngleDeg; firstRun = false; }
-
-    angle = ALPHA * (angle + gyroRateDeg * dt) + (1.0f - ALPHA) * accelAngleDeg;
-
-    // Read volatile gains/setpoint once per iteration
-    float sp = balanceAngleDeg;
-    float kp = Kp, ki = Ki, kd = Kd;
-
-    float error = angle - sp;
-
-
-    // FALL DETECTION
-    if (fabsf(error) > FALL_ANGLE_DEG) {
-        steP5V.setTargetSpeedRad(0.0f);
-        stePMOT.setTargetSpeedRad(0.0f);
-        integral  = 0.0f;
-        prevError = error;
-        g_angleDeg = angle; g_errorDeg = error; g_motorSpd = 0.0f;
-        return;
-    }
-
-    integral += error * dt;
-    integral = constrain(integral, -INTEGRAL_LIMIT_DEG, INTEGRAL_LIMIT_DEG);
-
-    float derivative = (error - prevError) / dt;
-    prevError = error;
-
-    float output = kp * error + ki * integral + kd * derivative;
-    output = constrain(output, -MAX_MOTOR_SPEED_RAD, MAX_MOTOR_SPEED_RAD);
-
-
-    // --- NEW: THE ANTI-JITTER OUTPUT FILTER ---
-    // 0.8 = 80% old speed, 20% new speed. The higher the decimal (up to 0.99), 
-    // the smoother the motor, but the slower the reaction time.
-    static float smoothed_output = 0.0f;
-    smoothed_output = (0.80f * smoothed_output) + (0.20f * output);
-
-    // --- SPEED DEADBAND (KILL THE HUM) ---
-    // If the requested speed is incredibly tiny, just lock the coils to stop limit cycling.
-    if (abs(smoothed_output) < 0.5f) {
-        smoothed_output = 0.0f;
-    }
-
-    steP5V.setTargetSpeedRad(-smoothed_output);
-    stePMOT.setTargetSpeedRad(smoothed_output);
-
-    //steP5V.setTargetSpeedRad(-output);
-    //stePMOT.setTargetSpeedRad(output);
-
-    motorSpeed = output;
-    g_angleDeg = angle;
-    g_errorDeg = error;
-    g_motorSpd = motorSpeed;
-
-  }
-
-  //power monitoring
-  uint16_t motorV = 0;
+  // POWER MONITORING - loop
+  
+  // init
   uint16_t VMOT = 0;
+  float V5 = 5.174; // absolute voltage on -ve side of high-side resistor. Not quite 5V
 
-  uint16_t measured_voltage0 = readADC(2);
-  float logicV = (((measured_voltage0 * VREF)/4095.0) - offset) /gain;
+  // read from ADC
+  uint16_t measured_voltage0 = readADC(0);
   uint16_t measured_voltage1 = readADC(1);
-  //float V5 = ((measured_voltage1 * VREF)/4095.0);
-  float V5 = 5.174;
-  //uint16_t measured_voltage2 = readADC(2);
-  //float motorV = (((measured_voltage2 * VREF)/4095.0) - offset) /gain;
-  //uint16_t measured_voltage3 = readADC(3);
-  //float VMOT = ((measured_voltage3 * VREF)/4095.0);
 
-  //Find power consumption for logic 
-  float I1 = logicV/0.01f;
+
+  // Subtracts the output offset, and divides by the total gain
+  // to reobtain the voltage across the current sense resistor
+  float Vdrop_logic = (((measured_voltage0 * VREF)/4095.0) - offset) /gain;
+  float Vdrop_motor = (((measured_voltage1 * VREF)/4095.0) - offset) /gain;
+
+  //Find currents and total instantaneous power
+  float I1 = Vdrop_logic/0.01f;
   float P5V = V5 * I1;
- 
-  //Find power consumption for motor 
-  float I2 = motorV/0.1f;
-  float PMOT = VMOT * I2;
 
+  float I2 = Vdrop_motor/0.1f;
+  float PMOT = VMOT * I2;
 
   float P = P5V + PMOT;
 
+  // Sums total energy over each loop time
   float current_time = millis();
   float looptime = current_time - start_time;
-
   Energy += (P5V * looptime);
-  Serial.print(measured_voltage0);
   
+  Serial.print(measured_voltage0);
   //Serial.print(logicV);
   //Serial.print(' ');
   //Serial.print(P);
@@ -394,7 +305,7 @@ void loop()
     /*
     Serial.print(tiltx*1000);
     Serial.print(' ');
-    Serial.print(steP5V.getSpeedRad());
+    Serial.print(step1.getSpeedRad());
     Serial.print(' ');
     Serial.print((readADC(0) * VREF)/4095.0);
     Serial.print(' ');
